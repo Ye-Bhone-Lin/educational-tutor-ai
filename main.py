@@ -1,94 +1,110 @@
-from typing import Literal, Optional
-from langchain_community.document_loaders import PyPDFLoader, UnstructuredPowerPointLoader, YoutubeLoader
+from langchain_community.document_loaders import PyPDFLoader, UnstructuredPowerPointLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import QdrantVectorStore
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import create_stuff_documents_chain, create_retrieval_chain
-from langchain_openai import OpenAI
+from langchain_groq import ChatGroq 
+from dotenv import load_dotenv 
+from langchain.chains import RetrievalQA 
+from langchain_community.tools import DuckDuckGoSearchResults
+from langchain.tools import Tool
+from langchain.agents import initialize_agent, Tool, AgentType
+import os
 
-class RetrieveApproach:
-    def __init__(self, model, pptx: Optional[str] = None, pdf_file: Optional[str] = None, youtube_vd: Optional[str] = None):
-        self.pptx = pptx
-        self.pdf_file = pdf_file
-        self.youtube_vd = youtube_vd
-        self.model = model
-        self.documents = None
-        self.chain = None
 
-    def pdf_load_documents(self):
-        loader = PyPDFLoader(self.pdf_file)
-        self.documents = loader.load()
+def load_document(file_path, file_type):
+    """
+    Load document based on file type
+    """
+    if file_type.lower() == "pdf":
+        loader = PyPDFLoader(file_path)
+    elif file_type.lower() == "pptx":
+        loader = UnstructuredPowerPointLoader(file_path)
+    else:
+        raise ValueError("Unsupported file type. Please use 'pdf' or 'pptx'")
     
-    def pptx_load_documents(self):
-        loader = UnstructuredPowerPointLoader(self.pptx, mode='paged')
-        self.documents = loader.load()
-
-    def youtube_load_documents(self):
-        loader = YoutubeLoader.from_youtube_url(self.youtube_vd, add_video_info=False)
-        self.documents = loader.load()
-
-    def load_documents(self):
-        if self.pdf_file:
-            self.pdf_load_documents()
-        elif self.pptx:
-            self.pptx_load_documents()
-        elif self.youtube_vd:
-            self.youtube_load_documents()
-        else:
-            raise ValueError("No document source provided.")
+    return loader.load()
 
 
-    def vector_database(self):
-        if not self.documents:
-            raise ValueError("No documents loaded. Call load_documents() first.")
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-        split_docs = splitter.split_documents(self.documents)
-
-        client = QdrantClient(":memory:")
-        client.create_collection(
-            collection_name="zoomcamp-project1",
-            vectors_config=VectorParams(size=384, distance=Distance.COSINE)
-        )
-
-        embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
-        vector_store = QdrantVectorStore(
-            client=client,
-            collection_name="zoomcamp-project1",
-            embedding=embedding_model
-        )
-        model = OpenAI(
-            base_url="http://0.0.0.0:1233/v1",  # example endpoint
-            api_key="lm-studio",
-            model="llama-3.2-3b-instruct"
-        )
-
-        vector_store.add_documents(split_docs)
-
-        retriever = vector_store.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"score_threshold": 0.5, "k": 1}
-        )
-
-        system_prompt = (
-            "You are a smart assistant. "
-            "Provide concise and professional responses from the given context.\n\n{context}"
-        )
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}")
-        ])
-
-        stuff_chain = create_stuff_documents_chain(model, prompt)
-        chain = create_retrieval_chain(retriever, stuff_chain)
-        return chain 
+def setup_vector_store(documents):
+    """
+    Setup vector store with documents
+    """
+    # Split documents
+    chunk = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=False)
+    split_doc = chunk.split_documents(documents)
     
-    def query(question: str) -> str:
-        if not self.chain:
-            raise ValueError("Chain not initialized. Call vector_database() first.")
-        result = self.chain.invoke({"input": question})
-        return result["answer"]
+    # Setup Qdrant client
+    client = QdrantClient(":memory:")
+    client.create_collection(
+        collection_name="zoomcamp-project1",
+        vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+    )
+    
+    # Setup embedding model
+    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    # Setup vector store
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name="zoomcamp-project1",
+        embedding=embedding_model
+    )
+    
+    # Add documents to vector store
+    vector_store.add_documents(split_doc)
+    
+    return vector_store
+
+
+def create_agent(vector_store):
+    """
+    Create the agent with tools
+    """
+    # Setup LLM
+    model = ChatGroq(model_name="llama-3.3-70b-versatile")
+    
+    # Setup retriever
+    retriever = vector_store.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={"score_threshold": 0.5, "k": 1}
+    )
+    
+    # Setup retrieval QA chain
+    retrieval_qa_chain = RetrievalQA.from_chain_type(
+        llm=model,
+        retriever=retriever, 
+        return_source_documents=True
+    )
+    
+    # Setup DuckDuckGo search tool
+    def ddg_search(query: str):
+        ddg = DuckDuckGoSearchResults()
+        return ddg.invoke(query)
+    
+    website_tool = Tool(
+        name="Website Tool",
+        func=ddg_search,
+        description="Help the STUDENTS to know better life time"
+    )
+    
+    # Setup tools
+    tools = [
+        Tool(
+            name="Document Retrieval",
+            func=lambda q: retrieval_qa_chain.invoke({"query": q})["result"],
+            description="Retrieve knowledge from the document"
+        ),
+        website_tool
+    ]
+    
+    # Initialize agent
+    agent = initialize_agent(
+        tools=tools, 
+        llm=model,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION
+    )
+    
+    return agent
