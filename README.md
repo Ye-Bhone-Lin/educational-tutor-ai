@@ -121,7 +121,13 @@ GROQ_API_KEY=your_groq_api_key_here
 - Chat-like interaction
 - File upload with drag-and-drop support
 
-## Troubleshooting
+### Demonstration
+
+<img width="1916" height="956" alt="Screenshot 2025-08-08 at 5 39 37 PM" src="https://github.com/user-attachments/assets/1d754b77-fec6-4a7d-af03-959c887df1b9" />
+
+<img width="1917" height="959" alt="Screenshot 2025-08-08 at 5 41 42 PM" src="https://github.com/user-attachments/assets/387d01b9-4d2c-4eb6-a0b5-9eb10a135ba8" />
+
+<img width="1916" height="956" alt="Screenshot 2025-08-08 at 5 57 00 PM" src="https://github.com/user-attachments/assets/b645b9cc-1b3b-437d-8ce7-fb422f8598b5" />
 
 ### Common Issues
 
