@@ -141,6 +141,22 @@ GROQ_API_KEY=your_groq_api_key_here
 - The system uses in-memory vector storage for faster access
 - Web search is available for additional context
 
+## GitHub Actions
+
+This project includes a GitHub Actions workflow for automated CI (Continuous Integration):
+
+### **CI Pipeline** (`.github/workflows/ci.yml`)
+- **Code Quality Checks**: Linting with flake8
+- **Code Formatting**: Black and isort formatting checks
+- **Security Scanning**: Bandit and Safety checks
+- **Artifact Upload**: Security scan results
+
+## GitHub Secrets Setup
+
+To enable full functionality, add these secrets to your GitHub repository:
+
+1. **GROQ_API_KEY**: Your Groq API key for the application
+
 ## License
 
 This project is for educational purposes.
