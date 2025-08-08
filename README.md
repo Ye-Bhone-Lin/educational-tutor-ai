@@ -8,7 +8,6 @@ A web-based AI assistant that can process PDF and PPTX documents and answer ques
 - 🤖 **AI-Powered Q&A**: Ask questions about your documents using advanced AI
 - 🔍 **Web Search Integration**: Combines document knowledge with web search capabilities
 - 💬 **Interactive Chat Interface**: Modern chat interface for easy interaction
-- 🎨 **Beautiful UI**: Clean and intuitive web interface
 
 ## Installation
 
@@ -141,10 +140,6 @@ GROQ_API_KEY=your_groq_api_key_here
 - For large documents, processing may take a few minutes
 - The system uses in-memory vector storage for faster access
 - Web search is available for additional context
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
 
 ## License
 
